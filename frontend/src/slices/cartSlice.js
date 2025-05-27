@@ -24,6 +24,19 @@ export const fetchAddToCart = createAsyncThunk(
     }
   }
 );
+export const fetchCart = createAsyncThunk(
+  "cart/fetchCart",
+  async (thunkAPI) => {
+    try {
+      const response = await axiosConfig.get(`/getCart`);
+      return response.data.cart_items;
+    } catch (error) {
+      return thunkAPI.rejectWithValue(
+        error.response?.data?.message || "Đã có lỗi xảy ra"
+      );
+    }
+  }
+);
 export const cartSlice = createSlice({
   name: "cart",
   initialState,
@@ -46,6 +59,22 @@ export const cartSlice = createSlice({
       })
       // call lỗi
       .addCase(fetchAddToCart.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || "Đã có lỗi xảy ra";
+      })
+
+      // pending(đang call)
+      .addCase(fetchCart.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      // call thành công
+      .addCase(fetchCart.fulfilled, (state, action) => {
+        state.loading = false;
+        state.carts = action.payload;
+      })
+      // call lỗi
+      .addCase(fetchCart.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload || "Đã có lỗi xảy ra";
       });
