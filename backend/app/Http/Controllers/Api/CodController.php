@@ -26,5 +26,46 @@ class OrderController extends Controller
         $cartItems = DB::table('cart_items')->where('cart_id', $cart->cart_id)->get();
         if ($cartItems->isEmpty()) return response()->json(['message' => 'Giỏ hàng trống'], 400);
 
+        // Bắt đầu transaction để đảm bảo tính toàn vẹn dữ liệu
+        DB::beginTransaction();
+        try {
+            // Tạo đơn hàng mới với phương thức COD (method_id = 2)
+            $orderId = DB::table('orders')->insertGetId([
+                'user_id' => $user->user_id,
+                'method_id' => 2, // 2 = COD
+                'total_amount' => 0, // Tổng tiền sẽ được cập nhật sau
+                'status' => 'processing', // Trạng thái: đang xử lý
+                'payment_status' => 'unpaid', // Chưa thanh toán
+                'voucher_id' => null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $total = 0; // Biến tính tổng tiền đơn hàng
+
+            // Lặp qua từng sản phẩm trong giỏ hàng
+            foreach ($cartItems as $item) {
+                // Lấy product_id tương ứng với variant_id
+                $productId = DB::table('product_variants')
+                    ->where('variant_id', $item->variant_id)
+                    ->value('product_id');
+
+                // Thêm từng sản phẩm vào bảng order_items
+                DB::table('order_items')->insert([
+                    'order_id' => $orderId,
+                    'product_id' => $productId,
+                    'variant_id' => $item->variant_id,
+                    'quantity' => $item->quantity,
+                    'price' => $item->price_snapshot, // giá tại thời điểm đặt hàng
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                // Cộng dồn tổng tiền của đơn hàng
+                $total += $item->price_snapshot * $item->quantity;
+            }
+            
+        } catch (\Throwable $th) {
+        }
     }
 }
